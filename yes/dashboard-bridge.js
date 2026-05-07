@@ -1,25 +1,23 @@
-async function pushRollercoinIntoPage() {
-  try {
-    const res = await chrome.runtime.sendMessage({
-      type: "GET_ROLLERCOIN_SYNC",
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "ROLLERCOIN_SYNC") {
+    chrome.storage.local.set({
+      rcLastPayload: msg.payload,
     });
 
-    if (!res?.ok || !res.payload) return;
+    console.log("[RC BG] Stored RollerCoin payload");
 
-    window.postMessage(
-      {
-        source: "rollercoin-extension",
-        type: "ROLLERCOIN_SYNC",
-        payload: res.payload,
-      },
-      window.location.origin
-    );
-
-    console.log("[RC BRIDGE] pushed RollerCoin payload into dashboard");
-  } catch (err) {
-    console.error("[RC BRIDGE] failed", err);
+    sendResponse({ ok: true });
+    return true;
   }
-}
 
-pushRollercoinIntoPage();
-setInterval(pushRollercoinIntoPage, 15000);
+  if (msg?.type === "GET_ROLLERCOIN_SYNC") {
+    chrome.storage.local.get(["rcLastPayload"]).then(({ rcLastPayload }) => {
+      sendResponse({
+        ok: true,
+        payload: rcLastPayload || null,
+      });
+    });
+
+    return true;
+  }
+});
