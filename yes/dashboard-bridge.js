@@ -1,23 +1,42 @@
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === "ROLLERCOIN_SYNC") {
-    chrome.storage.local.set({
-      rcLastPayload: msg.payload,
-    });
+// Listen for requests from the page and relay extension data
+window.addEventListener("message", async (event) => {
+  if (event.origin !== window.location.origin) return;
 
-    console.log("[RC BG] Stored RollerCoin payload");
+  const data = event.data;
 
-    sendResponse({ ok: true });
-    return true;
-  }
+  // Handle REQUEST_LATEST from the app
+  if (data?.source === "rollercoin-app" && data?.type === "REQUEST_LATEST") {
+    console.log("[RC BRIDGE] REQUEST_LATEST received from app");
 
-  if (msg?.type === "GET_ROLLERCOIN_SYNC") {
-    chrome.storage.local.get(["rcLastPayload"]).then(({ rcLastPayload }) => {
-      sendResponse({
-        ok: true,
-        payload: rcLastPayload || null,
-      });
-    });
+    try {
+      const { rcLastPayload } = await chrome.storage.local.get(["rcLastPayload"]);
 
-    return true;
+      if (rcLastPayload) {
+        window.postMessage(
+          {
+            source: "rollercoin-ext",
+            type: "ROLLERCOIN_PUSH",
+            payload: rcLastPayload,
+          },
+          window.location.origin
+        );
+
+        console.log("[RC BRIDGE] Sent cached payload to app");
+      }
+    } catch (err) {
+      console.error("[RC BRIDGE] Error retrieving payload:", err);
+    }
   }
 });
+
+// Send READY signal on page load
+setTimeout(() => {
+  window.postMessage(
+    {
+      source: "rollercoin-ext",
+      type: "READY",
+    },
+    window.location.origin
+  );
+  console.log("[RC BRIDGE] READY signal sent to app");
+}, 500);

@@ -183,19 +183,27 @@ async function syncRollercoin() {
   const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
 
   const syncPayload = {
-    source: "rollercoin",
-    currency: "TRX",
-    rawCurrency: "TRX_SMALL",
+    total_trx: totalTrx,
+    today_trx: rows.find(r => r.date === getToday())?.trx || 0,
+    balance_trx: totalTrx,
+    synced_at: new Date().toISOString(),
+    rows,
     from: START_DATE,
     to: getToday(),
-    totalTrx,
-    rows,
-    syncedAt: new Date().toISOString(),
   };
 
   await chrome.storage.local.set({
     rcLastPayload: syncPayload,
   });
+
+  window.postMessage(
+    {
+      source: "rollercoin-ext",
+      type: "ROLLERCOIN_PUSH",
+      payload: syncPayload,
+    },
+    window.location.origin
+  );
 
 chrome.runtime.sendMessage({
   type: "ROLLERCOIN_SYNC",
