@@ -197,14 +197,10 @@ async function syncRollercoin() {
     rcLastPayload: syncPayload,
   });
 
-  window.postMessage(
-    {
-      source: "rollercoin-extension",
-      type: "ROLLERCOIN_SYNC",
-      payload: syncPayload,
-    },
-    window.location.origin
-  );
+chrome.runtime.sendMessage({
+  type: "ROLLERCOIN_SYNC",
+  payload: syncPayload,
+});
 
   console.log("[RC EXT] RollerCoin synced:", syncPayload);
 

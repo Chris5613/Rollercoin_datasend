@@ -2,13 +2,17 @@ function formatTrx(value) {
   return `${Number(value || 0).toFixed(6)} TRX`;
 }
 
-async function refreshUI() {
+async function refreshUI(message = null) {
   const el = document.getElementById("status");
 
   const { rcLastPayload } = await chrome.storage.local.get(["rcLastPayload"]);
 
   if (!rcLastPayload) {
-    el.innerHTML = `<div class="muted">No sync yet</div>`;
+    el.innerHTML = `
+      <div class="muted">
+        ${message || "No sync yet"}
+      </div>
+    `;
     return;
   }
 
@@ -28,12 +32,17 @@ async function refreshUI() {
     <div class="muted">
       Last sync: ${new Date(rcLastPayload.syncedAt).toLocaleString()}
     </div>
+
+    ${
+      message
+        ? `<div class="muted" style="margin-top:6px;color:#facc15;">${message}</div>`
+        : ""
+    }
   `;
 }
 
 document.getElementById("syncBtn").addEventListener("click", async () => {
   const btn = document.getElementById("syncBtn");
-  const el = document.getElementById("status");
 
   btn.textContent = "Syncing...";
   btn.disabled = true;
@@ -44,7 +53,7 @@ document.getElementById("syncBtn").addEventListener("click", async () => {
     });
 
     if (!tabs.length) {
-      el.innerHTML = `<div class="muted">Open RollerCoin first.</div>`;
+      await refreshUI("Open RollerCoin first.");
       return;
     }
 
@@ -56,9 +65,10 @@ document.getElementById("syncBtn").addEventListener("click", async () => {
       throw new Error(res?.error || "Sync failed");
     }
 
-    await refreshUI();
+    await refreshUI("Sync complete");
   } catch (err) {
-    el.innerHTML = `<div class="muted">Sync failed: ${err.message}</div>`;
+    await refreshUI(`Sync failed, showing last saved total.`);
+    console.error("Popup sync failed:", err);
   } finally {
     btn.textContent = "Sync Now";
     btn.disabled = false;
