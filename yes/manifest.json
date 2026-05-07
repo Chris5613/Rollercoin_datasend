@@ -16,15 +16,19 @@
   "background": {
     "service_worker": "background.js"
   },
+  
   "content_scripts": [
-    {
-      "matches": [
-        "https://rollercoin.com/*",
-        "https://www.rollercoin.com/*"
-      ],
-      "js": ["rollercoin-content.js"],
-      "run_at": "document_start"
-    },
+{
+  "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
+  "js": ["rollercoin-page-sniffer.js"],
+  "run_at": "document_start",
+  "world": "MAIN"
+},
+{
+  "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
+  "js": ["rollercoin-content.js"],
+  "run_at": "document_start"
+},
     {
       "matches": [
         "https://nam-qyn8.onrender.com/*"

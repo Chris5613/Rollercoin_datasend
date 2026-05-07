@@ -45,6 +45,28 @@ async function fetchIncomeStats(auth) {
   return await res.json();
 }
 
+
+window.addEventListener("message", async (event) => {
+  if (event.origin !== window.location.origin) return;
+
+  const data = event.data;
+
+  if (
+    !data ||
+    data.source !== "rollercoin-page-sniffer" ||
+    data.type !== "RC_AUTH_CAPTURED" ||
+    !data.auth
+  ) {
+    return;
+  }
+
+  await chrome.storage.local.set({
+    rcAuthToken: data.auth,
+  });
+
+  console.log("[RC EXT] Auth token captured and saved");
+});
+
 function installAuthCapture() {
   const script = document.createElement("script");
 
