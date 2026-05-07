@@ -27,17 +27,10 @@
     {
       "matches": ["https://nam-qyn8.onrender.com/*"],
       "js": ["dashboard-bridge.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://yourapp.com/*"],
-      "js": ["rollercoin-extension-bridge.js"],
-     "run_at": "document_start"
-   }
-    
+      "run_at": "document_start"
+    }
   ],
   "action": {
     "default_popup": "popup.html"
   }
 }
-
