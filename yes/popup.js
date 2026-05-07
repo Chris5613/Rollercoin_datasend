@@ -5,9 +5,7 @@ function formatTrx(value) {
 async function refreshUI() {
   const el = document.getElementById("status");
 
-  const { rcLastPayload } = await chrome.storage.local.get([
-    "rcLastPayload",
-  ]);
+  const { rcLastPayload } = await chrome.storage.local.get(["rcLastPayload"]);
 
   if (!rcLastPayload) {
     el.innerHTML = `<div class="muted">No sync yet</div>`;
@@ -34,20 +32,37 @@ async function refreshUI() {
 }
 
 document.getElementById("syncBtn").addEventListener("click", async () => {
-  const tabs = await chrome.tabs.query({
-    url: ["*://rollercoin.com/*", "*://www.rollercoin.com/*"],
-  });
+  const btn = document.getElementById("syncBtn");
+  const el = document.getElementById("status");
 
-  if (!tabs.length) {
-    alert("Open RollerCoin first.");
-    return;
+  btn.textContent = "Syncing...";
+  btn.disabled = true;
+
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ["*://rollercoin.com/*", "*://www.rollercoin.com/*"],
+    });
+
+    if (!tabs.length) {
+      el.innerHTML = `<div class="muted">Open RollerCoin first.</div>`;
+      return;
+    }
+
+    const res = await chrome.tabs.sendMessage(tabs[0].id, {
+      type: "FORCE_SYNC",
+    });
+
+    if (!res?.ok) {
+      throw new Error(res?.error || "Sync failed");
+    }
+
+    await refreshUI();
+  } catch (err) {
+    el.innerHTML = `<div class="muted">Sync failed: ${err.message}</div>`;
+  } finally {
+    btn.textContent = "Sync Now";
+    btn.disabled = false;
   }
-
-  await chrome.tabs.sendMessage(tabs[0].id, {
-    type: "FORCE_SYNC",
-  });
-
-  setTimeout(refreshUI, 1500);
 });
 
 refreshUI();

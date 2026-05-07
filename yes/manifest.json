@@ -3,36 +3,29 @@
   "name": "RollerCoin Earnings Bridge",
   "version": "1.0.0",
   "description": "Sync RollerCoin earnings into custom dashboard.",
-  "permissions": [
-    "storage",
-    "alarms",
-    "notifications"
-  ],
+  "permissions": ["storage", "alarms", "notifications"],
   "host_permissions": [
     "https://rollercoin.com/*",
     "https://www.rollercoin.com/*",
-    "https://your-dashboard-site.com/*"
+    "https://nam-qyn8.onrender.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
-  
   "content_scripts": [
-{
-  "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
-  "js": ["rollercoin-page-sniffer.js"],
-  "run_at": "document_start",
-  "world": "MAIN"
-},
-{
-  "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
-  "js": ["rollercoin-content.js"],
-  "run_at": "document_start"
-},
     {
-      "matches": [
-        "https://nam-qyn8.onrender.com/*"
-      ],
+      "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
+      "js": ["rollercoin-page-sniffer.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://rollercoin.com/*", "https://www.rollercoin.com/*"],
+      "js": ["rollercoin-content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://nam-qyn8.onrender.com/*"],
       "js": ["dashboard-bridge.js"],
       "run_at": "document_idle"
     }

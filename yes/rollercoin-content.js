@@ -1,19 +1,16 @@
-const API_URL =
-  "https://rollercoin.com/api/profile/income-stats";
-
+const API_URL = "https://rollercoin.com/api/profile/income-stats";
 const TRX_SCALE = 1e10;
+const START_DATE = "2026-03-01";
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
 async function fetchIncomeStats(auth) {
-
-  const from = "2026-03-01";
   const to = getToday();
 
   const url =
-    `${API_URL}?from=${encodeURIComponent(from)}` +
+    `${API_URL}?from=${encodeURIComponent(START_DATE)}` +
     `&to=${encodeURIComponent(to)}` +
     `&currency=TRX_SMALL`;
 
@@ -21,7 +18,6 @@ async function fetchIncomeStats(auth) {
     Accept: "application/json",
   };
 
-  // only attach auth if captured
   if (auth) {
     headers.Authorization = auth;
   }
@@ -33,18 +29,12 @@ async function fetchIncomeStats(auth) {
   });
 
   if (!res.ok) {
-
-    console.error(
-      "[RC EXT] income-stats failed",
-      res.status
-    );
-
+    console.error("[RC EXT] income-stats failed", res.status);
     throw new Error(`HTTP ${res.status}`);
   }
 
   return await res.json();
 }
-
 
 window.addEventListener("message", async (event) => {
   if (event.origin !== window.location.origin) return;
@@ -66,7 +56,6 @@ window.addEventListener("message", async (event) => {
 
   console.log("[RC EXT] Auth token captured and saved");
 });
-
 
 function decodeJwtPayload(token) {
   try {
@@ -106,9 +95,7 @@ function extractToken(value) {
         return parsed.session.access_token;
       }
     }
-  } catch {
-    // not JSON
-  }
+  } catch {}
 
   const jwtMatch = value.match(
     /([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/
@@ -178,75 +165,83 @@ async function sendTokenIfChanged() {
   }
 }
 
+async function syncRollercoin() {
+  const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
+
+  if (!rcAuthToken) {
+    console.log("[RC EXT] No auth token yet, trying cookie session...");
+  }
+
+  const payload = await fetchIncomeStats(rcAuthToken);
+
+  const rows = (payload.data || []).map((r) => ({
+    date: r.date,
+    raw: Number(r.value) || 0,
+    trx: (Number(r.value) || 0) / TRX_SCALE,
+  }));
+
+  const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
+
+  const syncPayload = {
+    source: "rollercoin",
+    currency: "TRX",
+    rawCurrency: "TRX_SMALL",
+    from: START_DATE,
+    to: getToday(),
+    totalTrx,
+    rows,
+    syncedAt: new Date().toISOString(),
+  };
+
+  await chrome.storage.local.set({
+    rcLastPayload: syncPayload,
+  });
+
+  window.postMessage(
+    {
+      source: "rollercoin-extension",
+      type: "ROLLERCOIN_SYNC",
+      payload: syncPayload,
+    },
+    window.location.origin
+  );
+
+  console.log("[RC EXT] RollerCoin synced:", syncPayload);
+
+  return syncPayload;
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "FORCE_SYNC") {
+    console.log("[RC EXT] FORCE_SYNC received");
+
+    syncRollercoin()
+      .then((payload) => {
+        sendResponse({ ok: true, payload });
+      })
+      .catch((err) => {
+        console.error("[RC EXT] FORCE_SYNC failed:", err);
+        sendResponse({ ok: false, error: err.message });
+      });
+
+    return true;
+  }
+});
+
 setTimeout(sendTokenIfChanged, 500);
 setTimeout(sendTokenIfChanged, 2000);
 setTimeout(sendTokenIfChanged, 5000);
 setInterval(sendTokenIfChanged, 30000);
 window.addEventListener("focus", sendTokenIfChanged);
-   
 
+setTimeout(() => {
+  syncRollercoin().catch((err) => {
+    console.warn("[RC EXT] initial sync skipped:", err.message);
+  });
+}, 10000);
 
-
-async function syncRollercoin() {
-
-  const { rcAuthToken } =
-    await chrome.storage.local.get(["rcAuthToken"]);
-
-if (!rcAuthToken) {
-  console.log("No auth token yet, trying cookie session...");
-}
-
-  try {
-
-    const payload =
-      await fetchIncomeStats(rcAuthToken);
-
-    const rows =
-      (payload.data || []).map((r) => ({
-        date: r.date,
-        trx: Number(r.value) / TRX_SCALE,
-      }));
-
-    const totalTrx =
-      rows.reduce((sum, r) => sum + r.trx, 0);
-
-    const syncPayload = {
-      source: "rollercoin",
-      currency: "TRX",
-      totalTrx,
-      rows,
-      syncedAt: new Date().toISOString(),
-    };
-
-    await chrome.storage.local.set({
-      rcLastPayload: syncPayload
-    });
-
-    window.postMessage({
-      source: "rollercoin-extension",
-      type: "ROLLERCOIN_SYNC",
-      payload: syncPayload,
-    });
-
-    console.log("RollerCoin synced:", syncPayload);
-
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-setInterval(syncRollercoin, 5 * 60 * 1000);
-
-setTimeout(syncRollercoin, 10000);
-
-chrome.runtime.onMessage.addListener(
-  (msg) => {
-
-    if (
-      msg?.type === "FORCE_SYNC"
-    ) {
-      syncRollercoin();
-    }
-
-  }
-);
+setInterval(() => {
+  syncRollercoin().catch((err) => {
+    console.warn("[RC EXT] auto sync failed:", err.message);
+  });
+}, 5 * 60 * 1000);
