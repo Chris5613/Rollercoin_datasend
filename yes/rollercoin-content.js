@@ -235,8 +235,6 @@ if (!rcAuthToken) {
   }
 }
 
-installAuthCapture();
-
 setInterval(syncRollercoin, 5 * 60 * 1000);
 
 setTimeout(syncRollercoin, 10000);
