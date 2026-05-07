@@ -8,70 +8,146 @@ function getToday() {
 }
 
 async function fetchIncomeStats(auth) {
+
   const from = "2026-03-01";
   const to = getToday();
 
   const url =
-    `${API_URL}?from=${from}&to=${to}&currency=TRX_SMALL`;
+    `${API_URL}?from=${encodeURIComponent(from)}` +
+    `&to=${encodeURIComponent(to)}` +
+    `&currency=TRX_SMALL`;
+
+  const headers = {
+    Accept: "application/json",
+  };
+
+  // only attach auth if captured
+  if (auth) {
+    headers.Authorization = auth;
+  }
 
   const res = await fetch(url, {
-    headers: {
-      Authorization: auth,
-      Accept: "application/json",
-    },
+    method: "GET",
+    headers,
     credentials: "include",
   });
 
   if (!res.ok) {
+
+    console.error(
+      "[RC EXT] income-stats failed",
+      res.status
+    );
+
     throw new Error(`HTTP ${res.status}`);
   }
 
-  return res.json();
+  return await res.json();
 }
 
-(function installAuthCapture() {
+function installAuthCapture() {
 
+  // FETCH HOOK
   const originalFetch = window.fetch;
 
   window.fetch = async function(input, init) {
 
     try {
-      const headers = init?.headers;
 
       let auth = null;
+
+      // init.headers
+      const headers = init?.headers;
 
       if (headers instanceof Headers) {
         auth =
           headers.get("authorization") ||
           headers.get("Authorization");
-      } else if (headers) {
+      }
+      else if (headers && typeof headers === "object") {
         auth =
           headers.authorization ||
           headers.Authorization;
       }
 
+      // Request object headers
+      if (!auth && input instanceof Request) {
+        auth =
+          input.headers.get("authorization") ||
+          input.headers.get("Authorization");
+      }
+
+      // Save token
       if (auth) {
+
+        console.log(
+          "[RC EXT] Captured fetch auth:",
+          auth
+        );
+
         chrome.storage.local.set({
           rcAuthToken: auth
         });
       }
 
-    } catch {}
+    } catch (err) {
+      console.error(
+        "[RC EXT] fetch hook error",
+        err
+      );
+    }
 
     return originalFetch.apply(this, arguments);
   };
 
-})();
+  // XHR HOOK
+  const originalSetHeader =
+    XMLHttpRequest.prototype.setRequestHeader;
+
+  XMLHttpRequest.prototype.setRequestHeader =
+    function(name, value) {
+
+      try {
+
+        if (
+          name &&
+          /^authorization$/i.test(String(name))
+        ) {
+
+          console.log(
+            "[RC EXT] Captured XHR auth:",
+            value
+          );
+
+          chrome.storage.local.set({
+            rcAuthToken: value
+          });
+        }
+
+      } catch (err) {
+        console.error(
+          "[RC EXT] xhr hook error",
+          err
+        );
+      }
+
+      return originalSetHeader.apply(
+        this,
+        arguments
+      );
+    };
+
+  console.log("[RC EXT] Auth capture installed");
+}
 
 async function syncRollercoin() {
 
   const { rcAuthToken } =
     await chrome.storage.local.get(["rcAuthToken"]);
 
-  if (!rcAuthToken) {
-    console.log("No auth token yet.");
-    return;
-  }
+if (!rcAuthToken) {
+  console.log("No auth token yet, trying cookie session...");
+}
 
   try {
 
@@ -111,6 +187,8 @@ async function syncRollercoin() {
     console.error(err);
   }
 }
+
+installAuthCapture();
 
 setInterval(syncRollercoin, 5 * 60 * 1000);
 
