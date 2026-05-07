@@ -1,64 +1,53 @@
+function formatTrx(value) {
+  return `${Number(value || 0).toFixed(6)} TRX`;
+}
+
 async function refreshUI() {
+  const el = document.getElementById("status");
 
-  const el =
-    document.getElementById("status");
-
-  const {
-    rcLastPayload
-  } = await chrome.storage.local.get([
-    "rcLastPayload"
+  const { rcLastPayload } = await chrome.storage.local.get([
+    "rcLastPayload",
   ]);
 
   if (!rcLastPayload) {
-    el.innerHTML =
-      `<div class="muted">No sync yet</div>`;
+    el.innerHTML = `<div class="muted">No sync yet</div>`;
     return;
   }
 
   el.innerHTML = `
-    <div>
-      <strong>
-        ${rcLastPayload.totalTrx.toFixed(6)} TRX
-      </strong>
+    <div style="font-size:22px;font-weight:800;margin-bottom:6px;">
+      ${formatTrx(rcLastPayload.totalTrx)}
     </div>
 
     <div class="muted">
-      ${rcLastPayload.rows.length} days loaded
+      Total earned since March 1, 2026
+    </div>
+
+    <div class="muted" style="margin-top:6px;">
+      ${rcLastPayload.rows?.length || 0} days loaded
     </div>
 
     <div class="muted">
-      Last sync:
-      ${new Date(
-        rcLastPayload.syncedAt
-      ).toLocaleString()}
+      Last sync: ${new Date(rcLastPayload.syncedAt).toLocaleString()}
     </div>
   `;
 }
 
-document
-  .getElementById("syncBtn")
-  .addEventListener("click", async () => {
-
-    const tabs =
-      await chrome.tabs.query({
-        url: "*://*.rollercoin.com/*"
-      });
-
-    if (!tabs.length) {
-      alert(
-        "Open RollerCoin first."
-      );
-      return;
-    }
-
-    await chrome.tabs.sendMessage(
-      tabs[0].id,
-      {
-        type: "FORCE_SYNC"
-      }
-    );
-
-    setTimeout(refreshUI, 2000);
+document.getElementById("syncBtn").addEventListener("click", async () => {
+  const tabs = await chrome.tabs.query({
+    url: ["*://rollercoin.com/*", "*://www.rollercoin.com/*"],
   });
+
+  if (!tabs.length) {
+    alert("Open RollerCoin first.");
+    return;
+  }
+
+  await chrome.tabs.sendMessage(tabs[0].id, {
+    type: "FORCE_SYNC",
+  });
+
+  setTimeout(refreshUI, 1500);
+});
 
 refreshUI();
