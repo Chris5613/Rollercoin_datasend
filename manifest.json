@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "RollerCoin Earnings Bridge",
+  "version": "1.0.0",
+  "description": "Sync RollerCoin earnings into custom dashboard.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://rollercoin.com/*",
+    "https://www.rollercoin.com/*",
+    "https://your-dashboard-site.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://rollercoin.com/*",
+        "https://www.rollercoin.com/*"
+      ],
+      "js": ["rollercoin-content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://nam-qyn8.onrender.com/*"
+      ],
+      "js": ["dashboard-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

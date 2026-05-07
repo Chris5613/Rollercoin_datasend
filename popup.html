@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 260px;
+      background: #111827;
+      color: white;
+      font-family: Arial;
+      padding: 14px;
+    }
+
+    .card {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      border: 0;
+      border-radius: 8px;
+      background: #22c55e;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .muted {
+      color: #94a3b8;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>RollerCoin Sync</h2>
+
+    <div id="status">Loading...</div>
+
+    <button id="syncBtn">
+      Sync Now
+    </button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
