@@ -46,98 +46,91 @@ async function fetchIncomeStats(auth) {
 }
 
 function installAuthCapture() {
+  const script = document.createElement("script");
 
-  // FETCH HOOK
-  const originalFetch = window.fetch;
+  script.textContent = `
+    (function () {
+      const AUTH_KEY = "__rcIncomeAuthHeader";
 
-  window.fetch = async function(input, init) {
-
-    try {
-
-      let auth = null;
-
-      // init.headers
-      const headers = init?.headers;
-
-      if (headers instanceof Headers) {
-        auth =
-          headers.get("authorization") ||
-          headers.get("Authorization");
-      }
-      else if (headers && typeof headers === "object") {
-        auth =
-          headers.authorization ||
-          headers.Authorization;
-      }
-
-      // Request object headers
-      if (!auth && input instanceof Request) {
-        auth =
-          input.headers.get("authorization") ||
-          input.headers.get("Authorization");
-      }
-
-      // Save token
-      if (auth) {
-
-        console.log(
-          "[RC EXT] Captured fetch auth:",
+      function saveAuth(auth) {
+        if (!auth) return;
+        window[AUTH_KEY] = auth;
+        window.postMessage({
+          source: "rollercoin-page-auth",
+          type: "RC_AUTH_CAPTURED",
           auth
-        );
-
-        chrome.storage.local.set({
-          rcAuthToken: auth
-        });
+        }, window.location.origin);
       }
 
-    } catch (err) {
-      console.error(
-        "[RC EXT] fetch hook error",
-        err
-      );
+      const originalFetch = window.fetch;
+
+      if (typeof originalFetch === "function") {
+        window.fetch = function(input, init) {
+          try {
+            let auth = null;
+
+            const headers = init && init.headers;
+
+            if (headers) {
+              if (typeof headers.get === "function") {
+                auth = headers.get("authorization") || headers.get("Authorization");
+              } else if (typeof headers === "object") {
+                auth = headers.authorization || headers.Authorization;
+              }
+            }
+
+            if (!auth && input && typeof input === "object" && input.headers && typeof input.headers.get === "function") {
+              auth = input.headers.get("authorization") || input.headers.get("Authorization");
+            }
+
+            if (auth) saveAuth(auth);
+          } catch (e) {}
+
+          return originalFetch.apply(this, arguments);
+        };
+      }
+
+      const originalSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+      XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        try {
+          if (name && /^authorization$/i.test(String(name))) {
+            saveAuth(value);
+          }
+        } catch (e) {}
+
+        return originalSetHeader.apply(this, arguments);
+      };
+
+      console.log("[RC PAGE] Auth sniffer injected");
+    })();
+  `;
+
+  (document.head || document.documentElement).appendChild(script);
+  script.remove();
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+
+    const data = event.data;
+
+    if (
+      !data ||
+      data.source !== "rollercoin-page-auth" ||
+      data.type !== "RC_AUTH_CAPTURED" ||
+      !data.auth
+    ) {
+      return;
     }
 
-    return originalFetch.apply(this, arguments);
-  };
+    console.log("[RC EXT] Captured page auth:", data.auth);
 
-  // XHR HOOK
-  const originalSetHeader =
-    XMLHttpRequest.prototype.setRequestHeader;
+    chrome.storage.local.set({
+      rcAuthToken: data.auth,
+    });
+  });
 
-  XMLHttpRequest.prototype.setRequestHeader =
-    function(name, value) {
-
-      try {
-
-        if (
-          name &&
-          /^authorization$/i.test(String(name))
-        ) {
-
-          console.log(
-            "[RC EXT] Captured XHR auth:",
-            value
-          );
-
-          chrome.storage.local.set({
-            rcAuthToken: value
-          });
-        }
-
-      } catch (err) {
-        console.error(
-          "[RC EXT] xhr hook error",
-          err
-        );
-      }
-
-      return originalSetHeader.apply(
-        this,
-        arguments
-      );
-    };
-
-  console.log("[RC EXT] Auth capture installed");
+  console.log("[RC EXT] Auth bridge installed");
 }
 
 async function syncRollercoin() {
