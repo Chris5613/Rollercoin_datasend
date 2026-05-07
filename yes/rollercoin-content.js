@@ -67,93 +67,125 @@ window.addEventListener("message", async (event) => {
   console.log("[RC EXT] Auth token captured and saved");
 });
 
-function installAuthCapture() {
-  const script = document.createElement("script");
 
-  script.textContent = `
-    (function () {
-      const AUTH_KEY = "__rcIncomeAuthHeader";
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split(".")[1];
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "="
+    );
 
-      function saveAuth(auth) {
-        if (!auth) return;
-        window[AUTH_KEY] = auth;
-        window.postMessage({
-          source: "rollercoin-page-auth",
-          type: "RC_AUTH_CAPTURED",
-          auth
-        }, window.location.origin);
-      }
-
-      const originalFetch = window.fetch;
-
-      if (typeof originalFetch === "function") {
-        window.fetch = function(input, init) {
-          try {
-            let auth = null;
-
-            const headers = init && init.headers;
-
-            if (headers) {
-              if (typeof headers.get === "function") {
-                auth = headers.get("authorization") || headers.get("Authorization");
-              } else if (typeof headers === "object") {
-                auth = headers.authorization || headers.Authorization;
-              }
-            }
-
-            if (!auth && input && typeof input === "object" && input.headers && typeof input.headers.get === "function") {
-              auth = input.headers.get("authorization") || input.headers.get("Authorization");
-            }
-
-            if (auth) saveAuth(auth);
-          } catch (e) {}
-
-          return originalFetch.apply(this, arguments);
-        };
-      }
-
-      const originalSetHeader = XMLHttpRequest.prototype.setRequestHeader;
-
-      XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-        try {
-          if (name && /^authorization$/i.test(String(name))) {
-            saveAuth(value);
-          }
-        } catch (e) {}
-
-        return originalSetHeader.apply(this, arguments);
-      };
-
-      console.log("[RC PAGE] Auth sniffer injected");
-    })();
-  `;
-
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
-
-  window.addEventListener("message", (event) => {
-    if (event.origin !== window.location.origin) return;
-
-    const data = event.data;
-
-    if (
-      !data ||
-      data.source !== "rollercoin-page-auth" ||
-      data.type !== "RC_AUTH_CAPTURED" ||
-      !data.auth
-    ) {
-      return;
-    }
-
-    console.log("[RC EXT] Captured page auth:", data.auth);
-
-    chrome.storage.local.set({
-      rcAuthToken: data.auth,
-    });
-  });
-
-  console.log("[RC EXT] Auth bridge installed");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
 }
+
+function extractToken(value) {
+  if (typeof value !== "string") return null;
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (parsed && typeof parsed === "object") {
+      if (typeof parsed.access_token === "string") return parsed.access_token;
+      if (typeof parsed.token === "string") return parsed.token;
+      if (typeof parsed.jwt === "string") return parsed.jwt;
+
+      if (parsed.currentSession?.access_token) {
+        return parsed.currentSession.access_token;
+      }
+
+      if (parsed.auth?.session?.access_token) {
+        return parsed.auth.session.access_token;
+      }
+
+      if (parsed.session?.access_token) {
+        return parsed.session.access_token;
+      }
+    }
+  } catch {
+    // not JSON
+  }
+
+  const jwtMatch = value.match(
+    /([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/
+  );
+
+  return jwtMatch ? jwtMatch[1] : null;
+}
+
+function isValidToken(token) {
+  if (!token || typeof token !== "string") return false;
+
+  const payload = decodeJwtPayload(token);
+  if (!payload) return false;
+
+  if (typeof payload.exp === "number") {
+    return payload.exp >= Math.floor(Date.now() / 1000);
+  }
+
+  return true;
+}
+
+function findAuthTokensInStorage() {
+  const tokens = [];
+
+  function scanStore(store) {
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i);
+        const value = store.getItem(key);
+        if (!value) continue;
+
+        const token = extractToken(value);
+        if (!token || !isValidToken(token)) continue;
+
+        if (!tokens.includes(token)) {
+          tokens.push(token);
+        }
+      }
+    } catch {}
+  }
+
+  scanStore(localStorage);
+  scanStore(sessionStorage);
+
+  return tokens;
+}
+
+let lastSentTokens = null;
+
+async function sendTokenIfChanged() {
+  const tokens = findAuthTokensInStorage();
+  const normalized = JSON.stringify(tokens.sort());
+
+  if (normalized === lastSentTokens) return;
+
+  lastSentTokens = normalized;
+
+  if (tokens.length > 0) {
+    await chrome.storage.local.set({
+      rcAuthToken: tokens[0],
+      rcAuthTokens: tokens,
+    });
+
+    console.log("[RC EXT] Stored RollerCoin auth token from storage");
+  } else {
+    console.log("[RC EXT] No token found in storage yet");
+  }
+}
+
+setTimeout(sendTokenIfChanged, 500);
+setTimeout(sendTokenIfChanged, 2000);
+setTimeout(sendTokenIfChanged, 5000);
+setInterval(sendTokenIfChanged, 30000);
+window.addEventListener("focus", sendTokenIfChanged);
+   
+
+
 
 async function syncRollercoin() {
 
