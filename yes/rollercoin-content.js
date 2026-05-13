@@ -6,6 +6,80 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function scrapePowerTextValue(label) {
+  const text = document.body?.innerText || "";
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const regex = new RegExp(`${escapedLabel}\\s*\\n\\s*([^\\n]+)`, "i");
+  const match = text.match(regex);
+
+  return match ? match[1].trim() : null;
+}
+
+function scrapeRollercoinPower() {
+  const bonusPowerRaw = scrapePowerTextValue("Bonus Power");
+  const hamsterBonusRaw = scrapePowerTextValue("Hamster Bonus Power");
+
+  const powerPayload = {
+    league: scrapePowerTextValue("League"),
+    maxPower: scrapePowerTextValue("Maximum power"),
+    currentPower: scrapePowerTextValue("Current power"),
+    miners: scrapePowerTextValue("Miners"),
+    bonusPower: bonusPowerRaw,
+    bonusPercent:
+      bonusPowerRaw?.match(/([+-]?\d+(?:\.\d+)?)%/)?.[1] || null,
+    hamsterBonusPower: hamsterBonusRaw,
+    hamsterBonusPercent:
+      hamsterBonusRaw?.match(/([+-]?\d+(?:\.\d+)?)%/)?.[1] || null,
+    rackBonus: scrapePowerTextValue("Rack Bonus"),
+    games: scrapePowerTextValue("Games"),
+    temporary: scrapePowerTextValue("Temporary"),
+    synced_at: new Date().toISOString(),
+  };
+
+  const hasUsefulData =
+    powerPayload.currentPower ||
+    powerPayload.miners ||
+    powerPayload.bonusPower;
+
+  if (!hasUsefulData) {
+    return null;
+  }
+
+  return powerPayload;
+}
+
+async function syncRollercoinPower() {
+  const powerPayload = scrapeRollercoinPower();
+
+  if (!powerPayload) {
+    console.log("[RC EXT] Power panel not found yet");
+    return null;
+  }
+
+  await chrome.storage.local.set({
+    rcPowerPayload: powerPayload,
+  });
+
+  window.postMessage(
+    {
+      source: "rollercoin-ext",
+      type: "ROLLERCOIN_POWER_PUSH",
+      payload: powerPayload,
+    },
+    window.location.origin
+  );
+
+  chrome.runtime.sendMessage({
+    type: "ROLLERCOIN_POWER_SYNC",
+    payload: powerPayload,
+  });
+
+  console.log("[RC EXT] RollerCoin power synced:", powerPayload);
+
+  return powerPayload;
+}
+
 async function fetchIncomeStats(auth) {
   const to = getToday();
 
@@ -236,7 +310,12 @@ setTimeout(sendTokenIfChanged, 500);
 setTimeout(sendTokenIfChanged, 2000);
 setTimeout(sendTokenIfChanged, 5000);
 setInterval(sendTokenIfChanged, 30000);
+setTimeout(syncRollercoinPower, 3000);
+setTimeout(syncRollercoinPower, 8000);
+setInterval(syncRollercoinPower, 60 * 1000);
+window.addEventListener("focus", syncRollercoinPower);
 window.addEventListener("focus", sendTokenIfChanged);
+
 
 setTimeout(() => {
   syncRollercoin().catch((err) => {
