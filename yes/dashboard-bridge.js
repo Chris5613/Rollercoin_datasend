@@ -31,12 +31,13 @@ if (
         : `Bearer ${rcAuthToken}`;
     }
 
-    const response = await fetch(
-      `https://api.rollercoincalculator.app/api/RollercoinUser?userName=${encodeURIComponent(username)}`,
-      {
-        headers,
-      }
-    );
+const response = await fetch(
+  "https://rollercoin.com/api/profile/user-power-data",
+  {
+    headers,
+    credentials: "include",
+  }
+);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
