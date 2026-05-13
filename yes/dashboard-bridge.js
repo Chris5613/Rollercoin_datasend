@@ -5,7 +5,7 @@ window.addEventListener("message", async (event) => {
 
   const data = event.data;
 
-  if (
+if (
   data?.source === "rollercoin-app" &&
   data?.type === "REQUEST_POWER_BY_USERNAME"
 ) {
@@ -19,23 +19,57 @@ window.addEventListener("message", async (event) => {
   console.log("[RC BRIDGE] Fetching power for:", username);
 
   try {
+    const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
+
+    const headers = {
+      Accept: "application/json",
+    };
+
+    if (rcAuthToken) {
+      headers.Authorization = rcAuthToken.startsWith("Bearer ")
+        ? rcAuthToken
+        : `Bearer ${rcAuthToken}`;
+    }
+
     const response = await fetch(
-      `https://api.rollercoincalculator.app/api/RollercoinUser?userName=${encodeURIComponent(username)}`
+      `https://api.rollercoincalculator.app/api/RollercoinUser?userName=${encodeURIComponent(username)}`,
+      {
+        headers,
+      }
     );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const powerData = await response.json();
+    const responseData = await response.json();
 
-    console.log("[RC BRIDGE] Power response:", powerData);
+    const power =
+      responseData?.userPowerResponseDto ||
+      responseData?.data ||
+      responseData;
+
+    console.log("[RC BRIDGE] Power response:", power);
+
+    localStorage.setItem(
+      "rollercoin:extension-state",
+      JSON.stringify({
+        power_payload: power,
+        power_last_seen_at: new Date().toISOString(),
+      })
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("rollercoin-power-update", {
+        detail: power,
+      })
+    );
 
     window.postMessage(
       {
         source: "rollercoin-ext",
         type: "ROLLERCOIN_POWER_PUSH",
-        payload: powerData?.userPowerResponseDto || null,
+        payload: power,
       },
       window.location.origin
     );
