@@ -6,6 +6,47 @@ window.addEventListener("message", async (event) => {
   const data = event.data;
 
   if (
+  data?.source === "rollercoin-app" &&
+  data?.type === "REQUEST_POWER_BY_USERNAME"
+) {
+  const username = String(data.username || "").trim();
+
+  if (!username) {
+    console.warn("[RC BRIDGE] No username provided");
+    return;
+  }
+
+  console.log("[RC BRIDGE] Fetching power for:", username);
+
+  try {
+    const response = await fetch(
+      `https://api.rollercoincalculator.app/api/RollercoinUser?userName=${encodeURIComponent(username)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const powerData = await response.json();
+
+    console.log("[RC BRIDGE] Power response:", powerData);
+
+    window.postMessage(
+      {
+        source: "rollercoin-ext",
+        type: "ROLLERCOIN_POWER_PUSH",
+        payload: powerData?.userPowerResponseDto || null,
+      },
+      window.location.origin
+    );
+  } catch (err) {
+    console.error("[RC BRIDGE] Failed to fetch power:", err);
+  }
+
+  return;
+}
+
+  if (
   data?.source === "rollercoin-ext" &&
   data?.type === "ROLLERCOIN_POWER_PUSH"
 ) {
