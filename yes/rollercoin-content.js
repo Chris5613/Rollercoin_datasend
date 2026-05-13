@@ -7,13 +7,33 @@ function getToday() {
 }
 
 function scrapePowerTextValue(label) {
-  const text = document.body?.innerText || "";
-  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const elements = [...document.querySelectorAll("*")];
 
-  const regex = new RegExp(`${escapedLabel}\\s*\\n\\s*([^\\n]+)`, "i");
-  const match = text.match(regex);
+  for (const el of elements) {
+    const text = el.textContent?.trim();
 
-  return match ? match[1].trim() : null;
+    if (text === label) {
+      const parent = el.parentElement;
+
+      if (!parent) continue;
+
+      const children = [...parent.children];
+      const index = children.indexOf(el);
+
+      if (index !== -1 && children[index + 1]) {
+        return children[index + 1].textContent?.trim() || null;
+      }
+
+      const lines = parent.innerText.split("\n").map(t => t.trim()).filter(Boolean);
+      const labelIndex = lines.indexOf(label);
+
+      if (labelIndex !== -1 && lines[labelIndex + 1]) {
+        return lines[labelIndex + 1];
+      }
+    }
+  }
+
+  return null;
 }
 
 function scrapeRollercoinPower() {
@@ -315,6 +335,16 @@ setTimeout(syncRollercoinPower, 8000);
 setInterval(syncRollercoinPower, 60 * 1000);
 window.addEventListener("focus", syncRollercoinPower);
 window.addEventListener("focus", sendTokenIfChanged);
+setTimeout(syncRollercoinPower, 3000);
+setTimeout(syncRollercoinPower, 8000);
+
+setInterval(() => {
+  syncRollercoinPower();
+}, 30000);
+
+window.addEventListener("focus", () => {
+  syncRollercoinPower();
+});
 
 
 setTimeout(() => {

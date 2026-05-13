@@ -5,6 +5,35 @@ window.addEventListener("message", async (event) => {
 
   const data = event.data;
 
+  if (
+  data?.source === "rollercoin-ext" &&
+  data?.type === "ROLLERCOIN_POWER_PUSH"
+) {
+  console.log("[RC BRIDGE] POWER PUSH received", data.payload);
+
+  try {
+    localStorage.setItem(
+      "rollercoin:extension-state",
+      JSON.stringify({
+        power_payload: data.payload,
+        power_last_seen_at: new Date().toISOString(),
+      })
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("rollercoin-power-update", {
+        detail: data.payload,
+      })
+    );
+
+    console.log("[RC BRIDGE] Power payload saved");
+  } catch (err) {
+    console.error("[RC BRIDGE] Failed to save power payload:", err);
+  }
+
+  return;
+}
+
   if (data?.source === "rollercoin-app" && data?.type === "REQUEST_LATEST") {
     console.log("[RC BRIDGE] REQUEST_LATEST received from app");
 
