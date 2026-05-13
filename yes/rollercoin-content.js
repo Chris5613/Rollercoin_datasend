@@ -69,35 +69,57 @@ function scrapeRollercoinPower() {
   return powerPayload;
 }
 
-async function syncRollercoinPower() {
-  const powerPayload = scrapeRollercoinPower();
+function readCookie(name) {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
-  if (!powerPayload) {
-    console.log("[RC EXT] Power panel not found yet");
-    return null;
+async function fetchUserPowerData(auth) {
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+
+  const csrf = readCookie("x-csrf");
+  if (csrf) headers["csrf-token"] = csrf;
+
+  if (auth) {
+    headers.Authorization = auth.startsWith("Bearer ")
+      ? auth
+      : `Bearer ${auth}`;
   }
 
-  await chrome.storage.local.set({
-    rcPowerPayload: powerPayload,
+  const res = await fetch("https://rollercoin.com/api/profile/user-power-data", {
+    method: "GET",
+    headers,
+    credentials: "include",
   });
 
-  window.postMessage(
-    {
-      source: "rollercoin-ext",
-      type: "ROLLERCOIN_POWER_PUSH",
-      payload: powerPayload,
-    },
-    window.location.origin
-  );
+  if (!res.ok) {
+    throw new Error(`user-power-data HTTP ${res.status}`);
+  }
 
-  chrome.runtime.sendMessage({
-    type: "ROLLERCOIN_POWER_SYNC",
-    payload: powerPayload,
-  });
+  return await res.json();
+}
 
-  console.log("[RC EXT] RollerCoin power synced:", powerPayload);
+async function syncRollercoinPower() {
+  const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
 
-  return powerPayload;
+  try {
+    const responseData = await fetchUserPowerData(rcAuthToken);
+    const powerPayload = responseData?.data || responseData;
+
+    await chrome.storage.local.set({
+      rcPowerPayload: powerPayload,
+    });
+
+    console.log("[RC EXT] RollerCoin power synced:", powerPayload);
+
+    return powerPayload;
+  } catch (err) {
+    console.error("[RC EXT] user-power-data failed:", err);
+    return null;
+  }
 }
 
 async function fetchIncomeStats(auth) {

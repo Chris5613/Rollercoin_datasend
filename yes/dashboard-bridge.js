@@ -5,116 +5,80 @@ window.addEventListener("message", async (event) => {
 
   const data = event.data;
 
-if (
-  data?.source === "rollercoin-app" &&
-  data?.type === "REQUEST_POWER_BY_USERNAME"
-) {
-  const username = String(data.username || "").trim();
+  if (
+    data?.source === "rollercoin-app" &&
+    data?.type === "REQUEST_POWER_BY_USERNAME"
+  ) {
+    console.log("[RC BRIDGE] Loading stored RollerCoin power");
 
-  if (!username) {
-    console.warn("[RC BRIDGE] No username provided");
+    try {
+      const { rcPowerPayload } = await chrome.storage.local.get([
+        "rcPowerPayload",
+      ]);
+
+      if (!rcPowerPayload) {
+        console.warn("[RC BRIDGE] No rcPowerPayload found. Open RollerCoin first.");
+        return;
+      }
+
+      localStorage.setItem(
+        "rollercoin:extension-state",
+        JSON.stringify({
+          power_payload: rcPowerPayload,
+          power_last_seen_at: new Date().toISOString(),
+        })
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("rollercoin-power-update", {
+          detail: rcPowerPayload,
+        })
+      );
+
+      console.log("[RC BRIDGE] Sent stored power to app:", rcPowerPayload);
+    } catch (err) {
+      console.error("[RC BRIDGE] Failed to load stored power:", err);
+    }
+
     return;
   }
 
-  console.log("[RC BRIDGE] Fetching power for:", username);
-
-  try {
-    const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
-
-    const headers = {
-      Accept: "application/json",
-    };
-
-    if (rcAuthToken) {
-      headers.Authorization = rcAuthToken.startsWith("Bearer ")
-        ? rcAuthToken
-        : `Bearer ${rcAuthToken}`;
-    }
-
-const response = await fetch(
-  "https://rollercoin.com/api/profile/user-power-data",
-  {
-    headers,
-    credentials: "include",
-  }
-);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const responseData = await response.json();
-
-    const power =
-      responseData?.userPowerResponseDto ||
-      responseData?.data ||
-      responseData;
-
-    console.log("[RC BRIDGE] Power response:", power);
-
-    localStorage.setItem(
-      "rollercoin:extension-state",
-      JSON.stringify({
-        power_payload: power,
-        power_last_seen_at: new Date().toISOString(),
-      })
-    );
-
-    window.dispatchEvent(
-      new CustomEvent("rollercoin-power-update", {
-        detail: power,
-      })
-    );
-
-    window.postMessage(
-      {
-        source: "rollercoin-ext",
-        type: "ROLLERCOIN_POWER_PUSH",
-        payload: power,
-      },
-      window.location.origin
-    );
-  } catch (err) {
-    console.error("[RC BRIDGE] Failed to fetch power:", err);
-  }
-
-  return;
-}
-
   if (
-  data?.source === "rollercoin-ext" &&
-  data?.type === "ROLLERCOIN_POWER_PUSH"
-) {
-  console.log("[RC BRIDGE] POWER PUSH received", data.payload);
+    data?.source === "rollercoin-ext" &&
+    data?.type === "ROLLERCOIN_POWER_PUSH"
+  ) {
+    console.log("[RC BRIDGE] POWER PUSH received", data.payload);
 
-  try {
-    localStorage.setItem(
-      "rollercoin:extension-state",
-      JSON.stringify({
-        power_payload: data.payload,
-        power_last_seen_at: new Date().toISOString(),
-      })
-    );
+    try {
+      localStorage.setItem(
+        "rollercoin:extension-state",
+        JSON.stringify({
+          power_payload: data.payload,
+          power_last_seen_at: new Date().toISOString(),
+        })
+      );
 
-    window.dispatchEvent(
-      new CustomEvent("rollercoin-power-update", {
-        detail: data.payload,
-      })
-    );
+      window.dispatchEvent(
+        new CustomEvent("rollercoin-power-update", {
+          detail: data.payload,
+        })
+      );
 
-    console.log("[RC BRIDGE] Power payload saved");
-  } catch (err) {
-    console.error("[RC BRIDGE] Failed to save power payload:", err);
+      console.log("[RC BRIDGE] Power payload saved");
+    } catch (err) {
+      console.error("[RC BRIDGE] Failed to save power payload:", err);
+    }
+
+    return;
   }
-
-  return;
-}
 
   if (data?.source === "rollercoin-app" && data?.type === "REQUEST_LATEST") {
     console.log("[RC BRIDGE] REQUEST_LATEST received from app");
 
     try {
-      const { rcLastPayload } = await chrome.storage.local.get(["rcLastPayload"]);
+      const { rcLastPayload } = await chrome.storage.local.get([
+        "rcLastPayload",
+      ]);
 
       window.postMessage(
         {
