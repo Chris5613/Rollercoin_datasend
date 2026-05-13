@@ -326,35 +326,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+function waitForPowerPanel() {
+  const text = document.body?.innerText || "";
+
+  if (
+    text.includes("My power") ||
+    text.includes("Maximum power") ||
+    text.includes("Current power")
+  ) {
+    console.log("[RC EXT] Power panel detected");
+
+    syncRollercoinPower();
+
+    setInterval(() => {
+      syncRollercoinPower();
+    }, 30000);
+
+    window.addEventListener("focus", () => {
+      syncRollercoinPower();
+    });
+
+    return;
+  }
+
+  console.log("[RC EXT] Waiting for power panel...");
+
+  setTimeout(waitForPowerPanel, 2000);
+}
+
 setTimeout(sendTokenIfChanged, 500);
 setTimeout(sendTokenIfChanged, 2000);
 setTimeout(sendTokenIfChanged, 5000);
+
 setInterval(sendTokenIfChanged, 30000);
-setTimeout(syncRollercoinPower, 3000);
-setTimeout(syncRollercoinPower, 8000);
-setInterval(syncRollercoinPower, 60 * 1000);
-window.addEventListener("focus", syncRollercoinPower);
+
 window.addEventListener("focus", sendTokenIfChanged);
-setTimeout(syncRollercoinPower, 3000);
-setTimeout(syncRollercoinPower, 8000);
 
-setInterval(() => {
-  syncRollercoinPower();
-}, 30000);
-
-window.addEventListener("focus", () => {
-  syncRollercoinPower();
-});
-
-
-setTimeout(() => {
-  syncRollercoin().catch((err) => {
-    console.warn("[RC EXT] initial sync skipped:", err.message);
-  });
-}, 10000);
-
-setInterval(() => {
-  syncRollercoin().catch((err) => {
-    console.warn("[RC EXT] auto sync failed:", err.message);
-  });
-}, 5 * 60 * 1000);
+waitForPowerPanel();
