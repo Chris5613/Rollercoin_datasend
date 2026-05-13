@@ -112,9 +112,11 @@ async function fetchIncomeStats(auth) {
     Accept: "application/json",
   };
 
-  if (auth) {
-    headers.Authorization = auth;
-  }
+if (auth) {
+  headers.Authorization = auth.startsWith("Bearer ")
+    ? auth
+    : `Bearer ${auth}`;
+}
 
   const res = await fetch(url, {
     method: "GET",
