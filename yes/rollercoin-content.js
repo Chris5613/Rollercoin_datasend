@@ -1,4 +1,4 @@
-const API_URL = "https://rollercoin.com/api/wallet/deposits";
+const API_URL = "https://rollercoin.com/api/profile/income-stats";
 const SOL_SCALE = 1e9;
 const START_DATE = "2026-03-01";
 const CURRENCY = "SOL_SMALL";
@@ -197,18 +197,23 @@ async function syncRollercoinPower() {
 }
 
 async function fetchIncomeStats(auth) {
-  const url = `${API_URL}?currency=${encodeURIComponent(CURRENCY)}`;
+  const from = START_DATE;
+  const to = getToday();
+
+  const url =
+    `${API_URL}?from=${encodeURIComponent(from)}` +
+    `&to=${encodeURIComponent(to)}` +
+    `&currency=${encodeURIComponent(CURRENCY)}`;
 
   const headers = {
     Accept: "application/json",
   };
 
-
-if (auth) {
-  headers.Authorization = auth.startsWith("Bearer ")
-    ? auth
-    : `Bearer ${auth}`;
-}
+  if (auth) {
+    headers.Authorization = auth.startsWith("Bearer ")
+      ? auth
+      : `Bearer ${auth}`;
+  }
 
   const res = await fetch(url, {
     method: "GET",
@@ -248,9 +253,13 @@ window.addEventListener("message", async (event) => {
 function decodeJwtPayload(token) {
   try {
     const payload = token.split(".")[1];
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+
+    const normalized =
+      payload.replace(/-/g, "+").replace(/_/g, "/");
+
     const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      normalized.length +
+      ((4 - (normalized.length % 4)) % 4),
       "="
     );
 
