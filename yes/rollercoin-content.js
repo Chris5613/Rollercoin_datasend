@@ -1,5 +1,5 @@
 const API_URL = "https://rollercoin.com/api/wallet/deposits";
-const SOL_SCALE = 1e9;
+const SOL_SCALE = 1
 const START_DATE = "2026-03-01";
 const CURRENCY = "SOL_SMALL";
 
