@@ -1,5 +1,5 @@
-function formatTrx(value) {
-  return `${Number(value || 0).toFixed(6)} TRX`;
+function formatSol(value) {
+  return `${Number(value || 0).toFixed(6)} SOL`;
 }
 
 async function refreshUI(message = null) {
@@ -18,7 +18,7 @@ async function refreshUI(message = null) {
 
   el.innerHTML = `
     <div style="font-size:22px;font-weight:800;margin-bottom:6px;">
-      ${formatTrx(rcLastPayload.totalTrx)}
+      ${formatSol(rcLastPayload.total_sol ?? rcLastPayload.total_trx)}
     </div>
 
     <div class="muted">

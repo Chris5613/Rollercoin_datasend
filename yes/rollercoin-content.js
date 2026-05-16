@@ -1,6 +1,7 @@
-const API_URL = "https://rollercoin.com/api/profile/income-stats";
-const TRX_SCALE = 1e10;
+const API_URL = "https://rollercoin.com/api/wallet/deposits";
+const SOL_SCALE = 1e9;
 const START_DATE = "2026-03-01";
+const CURRENCY = "SOL_SMALL";
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -102,11 +103,81 @@ async function fetchUserPowerData(auth) {
   return await res.json();
 }
 
+async function syncRollercoin() {
+  const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
+
+  if (!rcAuthToken) {
+    console.log("[RC EXT] No auth token yet");
+    return null;
+  }
+
+  try {
+    const payload = await fetchIncomeStats(rcAuthToken);
+
+    const rows = (payload.data || []).map((r) => {
+      const raw = Number(r.value ?? r.amount ?? 0) || 0;
+
+      // SOL_SMALL -> SOL
+      const sol = raw / SOL_SCALE;
+
+      const date =
+        r.date ||
+        r.created_at?.slice(0, 10) ||
+        r.createdAt?.slice(0, 10) ||
+        r.time?.slice(0, 10) ||
+        getToday();
+
+      return {
+        date,
+        raw,
+        sol,
+      };
+    });
+
+    const totalSol = rows.reduce((sum, r) => sum + r.sol, 0);
+
+    const todaySol = rows
+      .filter((r) => r.date === getToday())
+      .reduce((sum, r) => sum + r.sol, 0);
+
+    const syncPayload = {
+      currency: "SOL",
+
+      total_sol: totalSol,
+      today_sol: todaySol,
+      balance_sol: totalSol,
+
+      // legacy aliases
+      total_trx: totalSol,
+      today_trx: todaySol,
+      balance_trx: totalSol,
+
+      synced_at: new Date().toISOString(),
+      from: START_DATE,
+      to: getToday(),
+
+      rows,
+    };
+
+    await chrome.storage.local.set({
+      rcLastPayload: syncPayload,
+    });
+
+    console.log("[RC EXT] RollerCoin SOL synced:", syncPayload);
+
+    return syncPayload;
+  } catch (err) {
+    console.error("[RC EXT] syncRollercoin failed:", err);
+    return null;
+  }
+}
+
 async function syncRollercoinPower() {
   const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
 
   try {
     const responseData = await fetchUserPowerData(rcAuthToken);
+
     const powerPayload = responseData?.data || responseData;
 
     await chrome.storage.local.set({
@@ -123,16 +194,12 @@ async function syncRollercoinPower() {
 }
 
 async function fetchIncomeStats(auth) {
-  const to = getToday();
-
-  const url =
-    `${API_URL}?from=${encodeURIComponent(START_DATE)}` +
-    `&to=${encodeURIComponent(to)}` +
-    `&currency=TRX_SMALL`;
+  const url = `${API_URL}?currency=${encodeURIComponent(CURRENCY)}`;
 
   const headers = {
     Accept: "application/json",
   };
+
 
 if (auth) {
   headers.Authorization = auth.startsWith("Bearer ")
@@ -283,55 +350,6 @@ async function sendTokenIfChanged() {
   }
 }
 
-async function syncRollercoin() {
-  const { rcAuthToken } = await chrome.storage.local.get(["rcAuthToken"]);
-
-  if (!rcAuthToken) {
-    console.log("[RC EXT] No auth token yet, trying cookie session...");
-  }
-
-  const payload = await fetchIncomeStats(rcAuthToken);
-
-  const rows = (payload.data || []).map((r) => ({
-    date: r.date,
-    raw: Number(r.value) || 0,
-    trx: (Number(r.value) || 0) / TRX_SCALE,
-  }));
-
-  const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
-
-  const syncPayload = {
-    total_trx: totalTrx,
-    today_trx: rows.find(r => r.date === getToday())?.trx || 0,
-    balance_trx: totalTrx,
-    synced_at: new Date().toISOString(),
-    rows,
-    from: START_DATE,
-    to: getToday(),
-  };
-
-  await chrome.storage.local.set({
-    rcLastPayload: syncPayload,
-  });
-
-  window.postMessage(
-    {
-      source: "rollercoin-ext",
-      type: "ROLLERCOIN_PUSH",
-      payload: syncPayload,
-    },
-    window.location.origin
-  );
-
-chrome.runtime.sendMessage({
-  type: "ROLLERCOIN_SYNC",
-  payload: syncPayload,
-});
-
-  console.log("[RC EXT] RollerCoin synced:", syncPayload);
-
-  return syncPayload;
-}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "FORCE_SYNC") {
