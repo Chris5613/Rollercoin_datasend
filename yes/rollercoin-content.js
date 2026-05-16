@@ -1,5 +1,5 @@
 const API_URL = "https://rollercoin.com/api/wallet/deposits";
-const SOL_SCALE = 1
+const SOL_SCALE = 1e9;
 const START_DATE = "2026-03-01";
 const CURRENCY = "SOL_SMALL";
 
@@ -115,10 +115,13 @@ async function syncRollercoin() {
     const payload = await fetchIncomeStats(rcAuthToken);
 
     const rows = (payload.data || []).map((r) => {
-      const raw = Number(r.value ?? r.amount ?? 0) || 0;
+    const sol =
+      Number(r.amount) ||
+      Number(r.value_float) ||
+      Number(r.value_usual) ||
+      0;
 
-      // SOL_SMALL -> SOL
-      const sol = raw / SOL_SCALE;
+    const raw = sol * SOL_SCALE;
 
       const date =
         r.date ||
