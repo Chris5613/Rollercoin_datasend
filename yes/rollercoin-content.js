@@ -1,7 +1,8 @@
 const API_URL = "https://rollercoin.com/api/profile/income-stats";
-const SOL_SCALE = 1e9;
+const TRX_SCALE = 1e10;
 const START_DATE = "2026-03-01";
-const CURRENCY = "SOL_SMALL";
+const CURRENCY = "TRX_SMALL";
+
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -114,53 +115,45 @@ async function syncRollercoin() {
   try {
     const payload = await fetchIncomeStats(rcAuthToken);
 
-    const rows = (payload.data || []).map((r) => {
-    const sol =
-      Number(r.amount) ||
-      Number(r.value_float) ||
-      Number(r.value_usual) ||
-      0;
+const rows = (payload.data || []).map((r) => {
+  const trx =
+    Number(r.amount) ||
+    Number(r.value_float) ||
+    Number(r.value_usual) ||
+    0;
 
-    const raw = sol * SOL_SCALE;
+  const raw = trx * TRX_SCALE;
 
-      const date =
-        r.date ||
-        r.created_at?.slice(0, 10) ||
-        r.createdAt?.slice(0, 10) ||
-        r.time?.slice(0, 10) ||
-        getToday();
+  const date =
+    r.date ||
+    r.created_at?.slice(0, 10) ||
+    r.createdAt?.slice(0, 10) ||
+    r.time?.slice(0, 10) ||
+    getToday();
 
-      return {
-        date,
-        raw,
-        sol,
-      };
-    });
+  return {
+    date,
+    raw,
+    trx,
+  };
+});
 
-    const totalSol = rows.reduce((sum, r) => sum + r.sol, 0);
+const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
 
-    const todaySol = rows
-      .filter((r) => r.date === getToday())
-      .reduce((sum, r) => sum + r.sol, 0);
+const todayTrx = rows
+  .filter((r) => r.date === getToday())
+  .reduce((sum, r) => sum + r.trx, 0);
 
-    const syncPayload = {
-      currency: "SOL",
-
-      total_sol: totalSol,
-      today_sol: todaySol,
-      balance_sol: totalSol,
-
-      // legacy aliases
-      total_trx: totalSol,
-      today_trx: todaySol,
-      balance_trx: totalSol,
-
-      synced_at: new Date().toISOString(),
-      from: START_DATE,
-      to: getToday(),
-
-      rows,
-    };
+const syncPayload = {
+  currency: "TRX",
+  total_trx: totalTrx,
+  today_trx: todayTrx,
+  balance_trx: totalTrx,
+  synced_at: new Date().toISOString(),
+  from: START_DATE,
+  to: getToday(),
+  rows,
+};
 
     await chrome.storage.local.set({
       rcLastPayload: syncPayload,

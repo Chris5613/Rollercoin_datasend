@@ -1,49 +1,32 @@
-function formatSol(value) {
-  return `${Number(value || 0).toFixed(6)} SOL`;
+function formatTrx(value) {
+  return `${Number(value || 0).toFixed(6)} TRX`;
 }
 
 async function refreshUI(message = null) {
   const el = document.getElementById("status");
-
   const { rcLastPayload } = await chrome.storage.local.get(["rcLastPayload"]);
 
   if (!rcLastPayload) {
     el.innerHTML = `
-      <div class="muted">
-        ${message || "No sync yet"}
-      </div>
+      ${message || "No sync yet"}
     `;
     return;
   }
 
   el.innerHTML = `
-    <div style="font-size:22px;font-weight:800;margin-bottom:6px;">
-      ${formatSol(rcLastPayload.total_sol ?? rcLastPayload.total_trx)}
-    </div>
+    ${formatTrx(rcLastPayload.total_trx)}
 
-    <div class="muted">
-      Total earned since March 1, 2026
-    </div>
+    Total earned since March 1, 2026
 
-    <div class="muted" style="margin-top:6px;">
-      ${rcLastPayload.rows?.length || 0} days loaded
-    </div>
+    ${rcLastPayload.rows?.length || 0} days loaded
+    Last sync: ${new Date(rcLastPayload.synced_at || rcLastPayload.syncedAt).toLocaleString()}
 
-    <div class="muted">
-      Last sync: ${new Date(rcLastPayload.syncedAt).toLocaleString()}
-    </div>
-
-    ${
-      message
-        ? `<div class="muted" style="margin-top:6px;color:#facc15;">${message}</div>`
-        : ""
-    }
+    ${message ? `${message}` : ""}
   `;
 }
 
 document.getElementById("syncBtn").addEventListener("click", async () => {
   const btn = document.getElementById("syncBtn");
-
   btn.textContent = "Syncing...";
   btn.disabled = true;
 
@@ -67,7 +50,7 @@ document.getElementById("syncBtn").addEventListener("click", async () => {
 
     await refreshUI("Sync complete");
   } catch (err) {
-    await refreshUI(`Sync failed, showing last saved total.`);
+    await refreshUI("Sync failed, showing last saved total.");
     console.error("Popup sync failed:", err);
   } finally {
     btn.textContent = "Sync Now";
