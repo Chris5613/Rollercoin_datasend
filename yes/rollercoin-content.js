@@ -162,36 +162,6 @@ async function syncRollercoin() {
       };
     });
 
-    const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
-
-    const todayTrx = rows
-      .filter((r) => r.date === getToday())
-      .reduce((sum, r) => sum + r.trx, 0);
-
-    const syncPayload = {
-      currency: "TRX",
-      total_trx: totalTrx,
-      today_trx: todayTrx,
-      balance_trx: totalTrx,
-      synced_at: new Date().toISOString(),
-      from: START_DATE,
-      to: getToday(),
-      rows,
-    };
-
-    await chrome.storage.local.set({
-      rcLastPayload: syncPayload,
-    });
-
-    console.log("[RC EXT] RollerCoin TRX synced:", syncPayload);
-
-    return syncPayload;
-  } catch (err) {
-    console.error("[RC EXT] syncRollercoin failed:", err);
-    return null;
-  }
-}
-
 const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
 
 const todayTrx = rows
