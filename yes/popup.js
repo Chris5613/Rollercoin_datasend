@@ -19,7 +19,7 @@ async function refreshUI(message = null) {
     Total earned since March 1, 2026
 
     ${rcLastPayload.rows?.length || 0} days loaded
-    Last sync: ${new Date(rcLastPayload.synced_at || rcLastPayload.syncedAt).toLocaleString()}
+    Last sync: ${new Date(rcLastPayload.synced_at || rcLastPayload.synced_at).toLocaleString()}
 
     ${message ? `${message}` : ""}
   `;

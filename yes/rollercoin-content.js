@@ -190,13 +190,12 @@ async function syncRollercoinPower() {
 }
 
 async function fetchIncomeStats(auth) {
-  const from = START_DATE;
   const to = getToday();
 
   const url =
-    `${API_URL}?from=${encodeURIComponent(from)}` +
+    `${API_URL}?from=${encodeURIComponent(START_DATE)}` +
     `&to=${encodeURIComponent(to)}` +
-    `&currency=${encodeURIComponent(CURRENCY)}`;
+    `&currency=TRX_SMALL`;
 
   const headers = {
     Accept: "application/json",
@@ -207,6 +206,8 @@ async function fetchIncomeStats(auth) {
       ? auth
       : `Bearer ${auth}`;
   }
+
+  console.log("[RC EXT] Fetching income stats:", url);
 
   const res = await fetch(url, {
     method: "GET",
