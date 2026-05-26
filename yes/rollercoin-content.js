@@ -1,6 +1,6 @@
 const API_URL = "https://rollercoin.com/api/profile/income-stats";
 const TRX_SCALE = 1e10;
-const START_DATE = "2026-03-01";
+const START_DATE = "2026-05-22";
 const CURRENCY = "TRX_SMALL";
 
 
@@ -115,40 +115,82 @@ async function syncRollercoin() {
   try {
     const payload = await fetchIncomeStats(rcAuthToken);
 
-const rows = (payload.data || []).map((r) => {
-  const smallAmount =
-    Number(r.amount_small) ||
-    Number(r.value_small) ||
-    Number(r.amountSmall) ||
-    0;
+    const incomeRows =
+      Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.data?.items)
+          ? payload.data.items
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : Array.isArray(payload?.result)
+              ? payload.result
+              : Array.isArray(payload?.rows)
+                ? payload.rows
+                : [];
 
-  const normalAmount =
-    Number(r.amount) ||
-    Number(r.value_float) ||
-    Number(r.value_usual) ||
-    Number(r.income) ||
-    0;
+    console.log("[RC EXT] Parsed income rows:", incomeRows);
 
-  const trx =
-    smallAmount > 0
-      ? smallAmount / TRX_SCALE
-      : normalAmount;
+    const rows = incomeRows.map((r) => {
+      const rawValue =
+        r.value ??
+        r.amount ??
+        r.value_float ??
+        r.value_usual ??
+        r.income ??
+        r.total ??
+        0;
 
-  const raw = smallAmount > 0 ? smallAmount : trx * TRX_SCALE;
+      const raw = Number(rawValue) || 0;
 
-  const date =
-    r.date ||
-    r.created_at?.slice(0, 10) ||
-    r.createdAt?.slice(0, 10) ||
-    r.time?.slice(0, 10) ||
-    getToday();
+      // income-stats with TRX_SMALL returns raw small units.
+      // Example: 962787787985 / 1e10 = 96.2787787985 TRX
+      const trx = raw / TRX_SCALE;
 
-  return {
-    date,
-    raw,
-    trx,
-  };
-});
+      const date =
+        r.date ||
+        r.created_at?.slice?.(0, 10) ||
+        r.createdAt?.slice?.(0, 10) ||
+        r.time?.slice?.(0, 10) ||
+        r.timestamp?.slice?.(0, 10) ||
+        getToday();
+
+      return {
+        date,
+        raw,
+        trx,
+        original: r,
+      };
+    });
+
+    const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
+
+    const todayTrx = rows
+      .filter((r) => r.date === getToday())
+      .reduce((sum, r) => sum + r.trx, 0);
+
+    const syncPayload = {
+      currency: "TRX",
+      total_trx: totalTrx,
+      today_trx: todayTrx,
+      balance_trx: totalTrx,
+      synced_at: new Date().toISOString(),
+      from: START_DATE,
+      to: getToday(),
+      rows,
+    };
+
+    await chrome.storage.local.set({
+      rcLastPayload: syncPayload,
+    });
+
+    console.log("[RC EXT] RollerCoin TRX synced:", syncPayload);
+
+    return syncPayload;
+  } catch (err) {
+    console.error("[RC EXT] syncRollercoin failed:", err);
+    return null;
+  }
+}
 
 const totalTrx = rows.reduce((sum, r) => sum + r.trx, 0);
 
