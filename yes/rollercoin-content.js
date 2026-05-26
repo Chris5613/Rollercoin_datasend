@@ -116,13 +116,25 @@ async function syncRollercoin() {
     const payload = await fetchIncomeStats(rcAuthToken);
 
 const rows = (payload.data || []).map((r) => {
-  const trx =
+  const smallAmount =
+    Number(r.amount_small) ||
+    Number(r.value_small) ||
+    Number(r.amountSmall) ||
+    0;
+
+  const normalAmount =
     Number(r.amount) ||
     Number(r.value_float) ||
     Number(r.value_usual) ||
+    Number(r.income) ||
     0;
 
-  const raw = trx * TRX_SCALE;
+  const trx =
+    smallAmount > 0
+      ? smallAmount / TRX_SCALE
+      : normalAmount;
+
+  const raw = smallAmount > 0 ? smallAmount : trx * TRX_SCALE;
 
   const date =
     r.date ||
@@ -190,12 +202,13 @@ async function syncRollercoinPower() {
 }
 
 async function fetchIncomeStats(auth) {
+  const from = START_DATE;
   const to = getToday();
 
   const url =
-    `${API_URL}?from=${encodeURIComponent(START_DATE)}` +
+    `${API_URL}?from=${encodeURIComponent(from)}` +
     `&to=${encodeURIComponent(to)}` +
-    `&currency=TRX_SMALL`;
+    `&currency=${encodeURIComponent(CURRENCY)}`;
 
   const headers = {
     Accept: "application/json",
@@ -220,7 +233,11 @@ async function fetchIncomeStats(auth) {
     throw new Error(`HTTP ${res.status}`);
   }
 
-  return await res.json();
+  const json = await res.json();
+
+  console.log("[RC EXT] income-stats raw response:", json);
+
+  return json;
 }
 
 window.addEventListener("message", async (event) => {
